@@ -7,8 +7,6 @@ Original file is located at
     https://colab.research.google.com/drive/1ZX2mH5O9yqO9nfa9IMihj_Dd0GVGD0yG
 """
 
-pip install streamlit
-
 # app_previsao_vendas.py
 
 import streamlit as st
