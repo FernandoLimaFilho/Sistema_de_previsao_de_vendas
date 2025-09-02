@@ -38,65 +38,49 @@ client = gspread.authorize(creds)
 spreadsheet = client.open("Series temporais de vendas")
 
 # ---------------------------
-# Seleção do produto
+# Seleção do Produto
 # ---------------------------
 abas = [ws.title for ws in spreadsheet.worksheets()]
+produto = st.selectbox("Escolha o produto:", [""] + abas)  # "" evita seleção inicial
 
-# ---------------------------
-# Formulário interativo
-# ---------------------------
-with st.form("form_previsao"):
-    produto = st.selectbox("Escolha o produto:", [""] + abas)
-    mes_previsto = st.date_input("Selecione o mês para previsão:")
-    impacto_externo = st.radio(
-        "Houve algum fator relevante que impacta as vendas?",
-        ("Não", "Sim")
+if produto:  # só executa depois que o usuário escolheu o produto
+    # Carregar dados
+    worksheet = spreadsheet.worksheet(produto)
+    dados = worksheet.get_all_records()
+    df = pd.DataFrame(dados)
+    df["Data"] = pd.to_datetime(df["Data"])
+    df["MM2"] = df["Qtd vendida"].rolling(2).mean()
+
+    # ---------------------------
+    # Gráfico interativo
+    # ---------------------------
+    fig = px.line(
+        df,
+        x="Data",
+        y=["Qtd vendida", "MM2"],
+        title=f"Série Temporal de Vendas - {produto}",
+        markers=True,
+        template="plotly_white"
     )
-    calcular = st.form_submit_button("Calcular previsão")
+    fig.update_traces(selector=dict(name="Qtd vendida"), line=dict(color="gold", width=3))
+    fig.update_traces(selector=dict(name="MM2"), line=dict(color="black", width=3, dash="dash"))
+    fig.update_layout(
+        title_font=dict(size=22, family="Arial", color="black"),
+        xaxis_title="Período (mês/ano)",
+        yaxis_title="Quantidade Vendida",
+        xaxis=dict(showgrid=True, tickformat="%b %Y"),
+        yaxis=dict(showgrid=True),
+        hovermode="x unified",
+        legend_title="Legenda"
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
-# ---------------------------
-# Processamento após submissão
-# ---------------------------
-if calcular:
-    if not produto:
-        st.warning("⚠️ Por favor, selecione um produto.")
-    elif not mes_previsto:
-        st.warning("⚠️ Por favor, selecione o mês para previsão.")
-    else:
-        # Carregar dados do produto selecionado
-        worksheet = spreadsheet.worksheet(produto)
-        dados = worksheet.get_all_records()
-        df = pd.DataFrame(dados)
-        df["Data"] = pd.to_datetime(df["Data"])
-        df["MM2"] = df["Qtd vendida"].rolling(2).mean()
+    # ---------------------------
+    # Seleção do mês para previsão
+    # ---------------------------
+    mes_previsto = st.date_input("Selecione o mês para previsão:")
 
-        # ---------------------------
-        # Gráfico interativo
-        # ---------------------------
-        fig = px.line(
-            df,
-            x="Data",
-            y=["Qtd vendida", "MM2"],
-            title=f"Série Temporal de Vendas - {produto}",
-            markers=True,
-            template="plotly_white"
-        )
-        fig.update_traces(selector=dict(name="Qtd vendida"), line=dict(color="gold", width=3))
-        fig.update_traces(selector=dict(name="MM2"), line=dict(color="black", width=3, dash="dash"))
-        fig.update_layout(
-            title_font=dict(size=22, family="Arial", color="black"),
-            xaxis_title="Período (mês/ano)",
-            yaxis_title="Quantidade Vendida",
-            xaxis=dict(showgrid=True, tickformat="%b %Y"),
-            yaxis=dict(showgrid=True),
-            hovermode="x unified",
-            legend_title="Legenda"
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-        # ---------------------------
-        # Cálculo da previsão
-        # ---------------------------
+    if mes_previsto:  # só calcula depois que o usuário escolheu a data
         ano_anterior = mes_previsto - relativedelta(years=1)
         mes1 = mes_previsto - relativedelta(months=1)
         mes2 = mes_previsto - relativedelta(months=2)
@@ -112,6 +96,14 @@ if calcular:
 
             limite = 0.2
             discrepante = abs(venda_ano_anterior - media_2meses) > limite * media_2meses
+
+            # ---------------------------
+            # Fator externo
+            # ---------------------------
+            impacto_externo = st.radio(
+                "Houve algum fator relevante que impacta as vendas?",
+                ("Não", "Sim")
+            )
 
             previsao = None
             if not discrepante:
