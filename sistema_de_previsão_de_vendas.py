@@ -51,6 +51,10 @@ if produto:  # só executa depois que o usuário escolheu o produto
     df["Data"] = pd.to_datetime(df["Data"])
     df["MM2"] = df["Qtd vendida"].rolling(2).mean()
 
+    # Criando colunas de ano e mês
+    df["Ano"] = df["Data"].dt.year
+    df["Mes"] = df["Data"].dt.month
+
     # ---------------------------
     # Gráfico interativo
     # ---------------------------
@@ -81,18 +85,31 @@ if produto:  # só executa depois que o usuário escolheu o produto
     mes_previsto = st.date_input("Selecione o mês para previsão:")
 
     if mes_previsto:  # só calcula depois que o usuário escolheu a data
+        # Meses de referência
         ano_anterior = mes_previsto - relativedelta(years=1)
         mes1 = mes_previsto - relativedelta(months=1)
         mes2 = mes_previsto - relativedelta(months=2)
 
-        venda_ano_anterior = df[df["Data"] == ano_anterior]["Qtd vendida"].sum()
-        media_2meses = df[df["Data"].isin([mes1, mes2])]["Qtd vendida"].mean()
+        # ---------------------------
+        # Vendas do mesmo mês do ano anterior
+        # ---------------------------
+        venda_ano_anterior = df[
+            (df["Ano"] == ano_anterior.year) & (df["Mes"] == ano_anterior.month)
+        ]["Qtd vendida"].sum()
+
+        # ---------------------------
+        # Média dos 2 meses anteriores
+        # ---------------------------
+        media_2meses = df[
+            ((df["Ano"] == mes1.year) & (df["Mes"] == mes1.month)) |
+            ((df["Ano"] == mes2.year) & (df["Mes"] == mes2.month))
+        ]["Qtd vendida"].mean()
 
         if pd.isna(media_2meses):
             st.warning("⚠️ Base de dados incompleta! Alimente as vendas dos meses anteriores.")
         else:
             st.write(f"📊 Vendas {ano_anterior.strftime('%m/%Y')}: {venda_ano_anterior}")
-            st.write(f"📊 Média 2 meses anteriores: {media_2meses}")
+            st.write(f"📊 Média 2 meses anteriores: {media_2meses:.2f}")
 
             limite = 0.2
             discrepante = abs(venda_ano_anterior - media_2meses) > limite * media_2meses
@@ -121,5 +138,5 @@ if produto:  # só executa depois que o usuário escolheu o produto
 
             if previsao is not None:
                 st.success(
-                    f"✅ Previsão de vendas para {produto} em {mes_previsto.strftime('%m/%Y')}: {previsao}"
+                    f"✅ Previsão de vendas para {produto} em {mes_previsto.strftime('%m/%Y')}: {previsao:.2f}"
                 )
